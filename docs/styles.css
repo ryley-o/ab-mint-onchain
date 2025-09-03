@@ -198,6 +198,146 @@ select {
   border-radius: 8px;
 }
 
+.minter-interface {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.minter-interface h4 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+
+.auction-status {
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: var(--muted);
+  color: var(--bg);
+}
+
+.status-badge.upcoming {
+  background: #f59e0b;
+}
+
+.status-badge.live {
+  background: var(--accent);
+}
+
+.status-badge.completed {
+  background: #6b7280;
+}
+
+.extra-time-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.extra-time-badge.allowed {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: var(--accent);
+}
+
+.extra-time-badge.not-allowed {
+  background: rgba(107, 114, 128, 0.1);
+  border: 1px solid rgba(107, 114, 128, 0.3);
+  color: #9ca3af;
+}
+
+.refresh-status {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  background: rgba(156, 163, 175, 0.08);
+  border: 1px solid rgba(156, 163, 175, 0.2);
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+}
+
+.auction-timing {
+  margin-bottom: 1rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: rgba(34, 197, 94, 0.05);
+  border: 1px solid rgba(34, 197, 94, 0.15);
+  border-radius: 8px;
+}
+
+.timing-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.timing-item label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0;
+}
+
+.timing-item span {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.auction-stats {
+  display: grid;
+  gap: 1rem;
+}
+
+.stat-group h5 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.stat label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0;
+}
+
+.stat span {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 .site-footer {
   text-align: center;
   padding: 2rem 1rem 3rem;

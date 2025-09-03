@@ -106,11 +106,72 @@
               <dd id="minterType">—</dd>
             </div>
           </dl>
-          <div id="minterTodoArea" class="minter-todo">
-            <p>
-              TODO: Implement minter-specific interface based on type and
-              project.
-            </p>
+
+          <div id="minterRAMV0Interface" class="minter-interface" hidden>
+            <h4>RAM Auction Details</h4>
+
+            <div class="auction-status">
+              <span id="auctionStatus" class="status-badge">Loading...</span>
+              <span id="allowExtraTime" class="extra-time-badge" hidden
+                >Extra Time Allowed</span
+              >
+              <span id="refreshStatus" class="refresh-status"
+                >Refreshing in 30s</span
+              >
+            </div>
+
+            <div class="auction-timing">
+              <div class="timing-item">
+                <label>Total Duration</label>
+                <span id="totalDuration">—</span>
+              </div>
+              <div class="timing-item">
+                <label>Time Remaining</label>
+                <span id="timeRemaining">—</span>
+              </div>
+            </div>
+
+            <div class="auction-stats">
+              <div class="stat-group">
+                <h5>Auction Overview</h5>
+                <div class="stat-grid">
+                  <div class="stat">
+                    <label>Tokens for Sale</label>
+                    <span id="numTokensInAuction">—</span>
+                  </div>
+                  <div class="stat">
+                    <label>Total Bids</label>
+                    <span id="numBids">—</span>
+                  </div>
+                  <div class="stat">
+                    <label>Minted Tokens</label>
+                    <span id="numBidsMintedTokens">—</span>
+                  </div>
+                  <div class="stat">
+                    <label>Error Refunded</label>
+                    <span id="numBidsErrorRefunded">—</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="stat-group">
+                <h5>Bidding Information</h5>
+                <div class="stat-grid">
+                  <div class="stat">
+                    <label>Current Min Bid</label>
+                    <span id="lowestBidValue">—</span>
+                  </div>
+                  <div class="stat">
+                    <label>Min Next Bid</label>
+                    <span id="minimumNextBid">—</span>
+                  </div>
+                  <div class="stat">
+                    <label>Revenues Collected</label>
+                    <span id="revenuesCollected">—</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

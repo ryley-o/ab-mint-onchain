@@ -25,6 +25,19 @@ import {
     minterType: null,
     minterError: null,
     minterErrorText: null,
+    minterRAMV0Interface: null,
+    auctionStatus: null,
+    allowExtraTime: null,
+    numTokensInAuction: null,
+    numBids: null,
+    numBidsMintedTokens: null,
+    numBidsErrorRefunded: null,
+    lowestBidValue: null,
+    minimumNextBid: null,
+    revenuesCollected: null,
+    totalDuration: null,
+    timeRemaining: null,
+    refreshStatus: null,
   };
 
   /** wallet state */
@@ -36,8 +49,17 @@ import {
     projectNameCache: Object.create(null),
     coreAbi: null,
     minterFilterAbi: null,
+    minterRAMV0Abi: null,
     supportedMinterFilters: null,
     supportedMinterTypes: null,
+    countdownInterval: null,
+    auctionEndTime: null,
+    auctionStartTime: null,
+    refreshInterval: null,
+    refreshCountdownInterval: null,
+    currentMinterAddress: null,
+    currentCoreAddress: null,
+    currentProjectNumber: null,
   };
 
   document.addEventListener("DOMContentLoaded", init);
@@ -61,6 +83,25 @@ import {
     elements.minterType = document.getElementById("minterType");
     elements.minterError = document.getElementById("minterError");
     elements.minterErrorText = document.getElementById("minterErrorText");
+    elements.minterRAMV0Interface = document.getElementById(
+      "minterRAMV0Interface"
+    );
+    elements.auctionStatus = document.getElementById("auctionStatus");
+    elements.allowExtraTime = document.getElementById("allowExtraTime");
+    elements.numTokensInAuction = document.getElementById("numTokensInAuction");
+    elements.numBids = document.getElementById("numBids");
+    elements.numBidsMintedTokens = document.getElementById(
+      "numBidsMintedTokens"
+    );
+    elements.numBidsErrorRefunded = document.getElementById(
+      "numBidsErrorRefunded"
+    );
+    elements.lowestBidValue = document.getElementById("lowestBidValue");
+    elements.minimumNextBid = document.getElementById("minimumNextBid");
+    elements.revenuesCollected = document.getElementById("revenuesCollected");
+    elements.totalDuration = document.getElementById("totalDuration");
+    elements.timeRemaining = document.getElementById("timeRemaining");
+    elements.refreshStatus = document.getElementById("refreshStatus");
     if (elements.projectSelect) {
       elements.projectSelect.addEventListener("change", () => {
         if (elements.loadProjectButton) {
@@ -96,6 +137,7 @@ import {
         Promise.all([
           loadCoreAbi(),
           loadMinterFilterAbi(),
+          loadMinterRAMV0Abi(),
           loadSupportedMinterFilters(),
           loadSupportedMinterTypes(),
         ])
@@ -305,19 +347,12 @@ import {
 
   async function loadCoreAbi() {
     try {
-      console.log("Loading core ABI...");
       const res = await fetch("./abi/GenArt721CoreV3_Engine.json", {
         cache: "no-store",
       });
       if (!res.ok) throw new Error(`Failed to load ABI: ${res.status}`);
       const data = await res.json();
       state.coreAbi = data.abi;
-      console.log(
-        "Core ABI loaded successfully, functions:",
-        state.coreAbi
-          .filter((item) => item.type === "function")
-          .map((f) => f.name)
-      );
       // Refresh dropdown to load project names now that ABI is available
       populateProjectsDropdown();
     } catch (err) {
@@ -338,6 +373,21 @@ import {
     } catch (err) {
       console.warn("MinterFilter ABI load error", err);
       state.minterFilterAbi = null;
+    }
+  }
+
+  async function loadMinterRAMV0Abi() {
+    try {
+      const res = await fetch("./abi/MinterRAMV0.json", {
+        cache: "no-store",
+      });
+      if (!res.ok)
+        throw new Error(`Failed to load MinterRAMV0 ABI: ${res.status}`);
+      const data = await res.json();
+      state.minterRAMV0Abi = data.abi;
+    } catch (err) {
+      console.error("MinterRAMV0 ABI load error", err);
+      state.minterRAMV0Abi = null;
     }
   }
 
@@ -472,25 +522,12 @@ import {
   }
 
   async function fetchProjectName(contractAddress, projectNumber) {
-    if (!state.ethereum || !state.coreAbi) {
-      console.warn("fetchProjectName: Missing ethereum or coreAbi", {
-        hasEthereum: !!state.ethereum,
-        hasCoreAbi: !!state.coreAbi,
-      });
-      return null;
-    }
+    if (!state.ethereum || !state.coreAbi) return null;
     try {
-      console.log("fetchProjectName:", { contractAddress, projectNumber });
-
       const projectDetailsAbi = state.coreAbi.find(
         (item) => item.type === "function" && item.name === "projectDetails"
       );
-      if (!projectDetailsAbi) {
-        console.warn("projectDetails function not found in ABI");
-        return null;
-      }
-
-      console.log("Found projectDetails ABI:", projectDetailsAbi);
+      if (!projectDetailsAbi) return null;
 
       const data = encodeFunctionData({
         abi: [projectDetailsAbi],
@@ -498,14 +535,10 @@ import {
         args: [BigInt(projectNumber)],
       });
 
-      console.log("Encoded call data:", data);
-
       const result = await state.ethereum.request({
         method: "eth_call",
         params: [{ to: contractAddress, data }, "latest"],
       });
-
-      console.log("eth_call result:", result);
 
       const decoded = decodeFunctionResult({
         abi: [projectDetailsAbi],
@@ -513,10 +546,9 @@ import {
         data: result,
       });
 
-      console.log("Decoded result:", decoded);
       return decoded[0]; // projectName is the first return value
     } catch (err) {
-      console.error("projectDetails eth_call failed", err);
+      console.warn("projectDetails eth_call failed", err);
       return null;
     }
   }
@@ -529,8 +561,6 @@ import {
 
     try {
       const projectId = elements.projectSelect.value;
-      console.log("Loading project details for:", projectId);
-
       const parsed = parseProjectId(projectId);
       if (!parsed) {
         showMinterError("Invalid project ID format");
@@ -538,7 +568,6 @@ import {
       }
 
       const { contractAddress, projectNumber } = parsed;
-      console.log("Parsed project:", { contractAddress, projectNumber });
 
       // Step 1: Check core contract's minter
       const minterFilterAddress = await getCoreMinter(contractAddress);
@@ -583,7 +612,12 @@ import {
       }
 
       // Success - show minter info
-      showMinterInfo(projectMinterAddress, minterType);
+      showMinterInfo(
+        projectMinterAddress,
+        minterType,
+        contractAddress,
+        projectNumber
+      );
     } catch (err) {
       console.error("loadProjectDetails error", err);
       showMinterError("Failed to load project details");
@@ -591,25 +625,12 @@ import {
   }
 
   async function getCoreMinter(contractAddress) {
-    if (!state.ethereum || !state.coreAbi) {
-      console.warn("getCoreMinter: Missing ethereum or coreAbi", {
-        hasEthereum: !!state.ethereum,
-        hasCoreAbi: !!state.coreAbi,
-      });
-      return null;
-    }
+    if (!state.ethereum || !state.coreAbi) return null;
     try {
-      console.log("getCoreMinter for contract:", contractAddress);
-
       const minterContractAbi = state.coreAbi.find(
         (item) => item.type === "function" && item.name === "minterContract"
       );
-      if (!minterContractAbi) {
-        console.warn("minterContract function not found in ABI");
-        return null;
-      }
-
-      console.log("Found minterContract ABI:", minterContractAbi);
+      if (!minterContractAbi) return null;
 
       const data = encodeFunctionData({
         abi: [minterContractAbi],
@@ -617,14 +638,10 @@ import {
         args: [],
       });
 
-      console.log("Encoded minterContract call data:", data);
-
       const result = await state.ethereum.request({
         method: "eth_call",
         params: [{ to: contractAddress, data }, "latest"],
       });
-
-      console.log("minterContract eth_call result:", result);
 
       const decoded = decodeFunctionResult({
         abi: [minterContractAbi],
@@ -632,10 +649,9 @@ import {
         data: result,
       });
 
-      console.log("Decoded minter address:", decoded);
       return decoded;
     } catch (err) {
-      console.error("getCoreMinter failed", err);
+      console.warn("getCoreMinter failed", err);
       return null;
     }
   }
@@ -645,16 +661,6 @@ import {
     const chainKey = String(state.chainId);
     const supportedFilters =
       state.supportedMinterFilters[chainKey]?.minterFilters || [];
-
-    console.log("Checking minter filter support:", {
-      minterFilterAddress,
-      chainKey,
-      supportedFilters,
-      normalizedAddress: minterFilterAddress.toLowerCase(),
-      normalizedSupportedFilters: supportedFilters.map((addr) =>
-        addr.toLowerCase()
-      ),
-    });
 
     // Normalize both addresses to lowercase for comparison
     const normalizedAddress = minterFilterAddress.toLowerCase();
@@ -672,22 +678,11 @@ import {
   ) {
     if (!state.ethereum || !state.minterFilterAbi) return null;
     try {
-      console.log("getProjectMinter:", {
-        minterFilterAddress,
-        projectNumber,
-        coreContractAddress,
-      });
-
       const getMinterForProjectAbi = state.minterFilterAbi.find(
         (item) =>
           item.type === "function" && item.name === "getMinterForProject"
       );
-      if (!getMinterForProjectAbi) {
-        console.warn("getMinterForProject function not found in ABI");
-        return null;
-      }
-
-      console.log("Found getMinterForProject ABI:", getMinterForProjectAbi);
+      if (!getMinterForProjectAbi) return null;
 
       const data = encodeFunctionData({
         abi: [getMinterForProjectAbi],
@@ -695,14 +690,10 @@ import {
         args: [BigInt(projectNumber), coreContractAddress],
       });
 
-      console.log("Encoded getMinterForProject call data:", data);
-
       const result = await state.ethereum.request({
         method: "eth_call",
         params: [{ to: minterFilterAddress, data }, "latest"],
       });
-
-      console.log("getMinterForProject eth_call result:", result);
 
       const decoded = decodeFunctionResult({
         abi: [getMinterForProjectAbi],
@@ -710,42 +701,22 @@ import {
         data: result,
       });
 
-      console.log("Decoded project minter address:", decoded);
       return decoded;
     } catch (err) {
-      console.error("getProjectMinter failed", err);
+      console.warn("getProjectMinter failed", err);
       return null;
     }
   }
 
   async function getMinterType(minterFilterAddress, projectMinterAddress) {
-    if (!state.ethereum || !state.minterFilterAbi) {
-      console.warn("getMinterType: Missing ethereum or minterFilterAbi", {
-        hasEthereum: !!state.ethereum,
-        hasMinterFilterAbi: !!state.minterFilterAbi,
-      });
-      return null;
-    }
+    if (!state.ethereum || !state.minterFilterAbi) return null;
     try {
-      console.log("getMinterType:", {
-        minterFilterAddress,
-        projectMinterAddress,
-      });
-
       const getAllGloballyApprovedMintersAbi = state.minterFilterAbi.find(
         (item) =>
           item.type === "function" &&
           item.name === "getAllGloballyApprovedMinters"
       );
-      if (!getAllGloballyApprovedMintersAbi) {
-        console.warn("getAllGloballyApprovedMinters function not found in ABI");
-        return null;
-      }
-
-      console.log(
-        "Found getAllGloballyApprovedMinters ABI:",
-        getAllGloballyApprovedMintersAbi
-      );
+      if (!getAllGloballyApprovedMintersAbi) return null;
 
       const data = encodeFunctionData({
         abi: [getAllGloballyApprovedMintersAbi],
@@ -753,14 +724,10 @@ import {
         args: [],
       });
 
-      console.log("Encoded getAllGloballyApprovedMinters call data:", data);
-
       const result = await state.ethereum.request({
         method: "eth_call",
         params: [{ to: minterFilterAddress, data }, "latest"],
       });
-
-      console.log("getAllGloballyApprovedMinters eth_call result:", result);
 
       const decoded = decodeFunctionResult({
         abi: [getAllGloballyApprovedMintersAbi],
@@ -768,15 +735,7 @@ import {
         data: result,
       });
 
-      console.log("Decoded getAllGloballyApprovedMinters result:", decoded);
-      console.log("Type of decoded:", typeof decoded);
-      console.log("Is decoded an array?", Array.isArray(decoded));
-      console.log("Decoded length:", decoded?.length);
-      console.log("Decoded[0]:", decoded[0]);
-      console.log("Type of decoded[0]:", typeof decoded[0]);
-      console.log("Is decoded[0] an array?", Array.isArray(decoded[0]));
-
-      // Let's try different ways to access the data
+      // Try different ways to access the data
       let mintersWithTypes;
       if (Array.isArray(decoded)) {
         if (Array.isArray(decoded[0])) {
@@ -788,37 +747,19 @@ import {
         mintersWithTypes = decoded;
       }
 
-      console.log("Final mintersWithTypes:", mintersWithTypes);
-      console.log("Type of mintersWithTypes:", typeof mintersWithTypes);
-      console.log(
-        "Is mintersWithTypes an array?",
-        Array.isArray(mintersWithTypes)
-      );
-      console.log("Looking for project minter:", projectMinterAddress);
-
-      if (!Array.isArray(mintersWithTypes)) {
-        console.error(
-          "mintersWithTypes is not an array, cannot search for minter"
-        );
-        return null;
-      }
+      if (!Array.isArray(mintersWithTypes)) return null;
 
       // Find the minter in the array of structs
       const minterEntry = mintersWithTypes.find((entry) => {
-        console.log("Checking entry:", entry);
         return (
           entry.minterAddress?.toLowerCase() ===
           projectMinterAddress.toLowerCase()
         );
       });
 
-      console.log("Found minter entry:", minterEntry);
-      const minterType = minterEntry ? minterEntry.minterType : null;
-      console.log("Resolved minter type:", minterType);
-
-      return minterType;
+      return minterEntry ? minterEntry.minterType : null;
     } catch (err) {
-      console.error("getMinterType failed", err);
+      console.warn("getMinterType failed", err);
       return null;
     }
   }
@@ -831,7 +772,12 @@ import {
     return supportedTypes.includes(minterType);
   }
 
-  function showMinterInfo(minterAddress, minterType) {
+  async function showMinterInfo(
+    minterAddress,
+    minterType,
+    coreContractAddress,
+    projectNumber
+  ) {
     if (elements.minterAddress) {
       elements.minterAddress.textContent = shortenAddress(minterAddress);
     }
@@ -840,6 +786,38 @@ import {
     }
     if (elements.minterInfo) {
       elements.minterInfo.hidden = false;
+    }
+
+    // Hide all minter-specific interfaces first
+    hideMinterInterfaces();
+
+    // Show minter-specific interface based on type
+    if (minterType === "MinterRAMV0") {
+      await showMinterRAMV0Interface(
+        minterAddress,
+        coreContractAddress,
+        projectNumber
+      );
+    }
+  }
+
+  function hideMinterInterfaces() {
+    // Stop any active timers
+    if (state.countdownInterval) {
+      clearInterval(state.countdownInterval);
+      state.countdownInterval = null;
+    }
+    if (state.refreshInterval) {
+      clearInterval(state.refreshInterval);
+      state.refreshInterval = null;
+    }
+    if (state.refreshCountdownInterval) {
+      clearInterval(state.refreshCountdownInterval);
+      state.refreshCountdownInterval = null;
+    }
+
+    if (elements.minterRAMV0Interface) {
+      elements.minterRAMV0Interface.hidden = true;
     }
   }
 
@@ -861,6 +839,445 @@ import {
   function hideMinterError() {
     if (elements.minterError) {
       elements.minterError.hidden = true;
+    }
+  }
+
+  async function showMinterRAMV0Interface(
+    minterAddress,
+    coreContractAddress,
+    projectNumber
+  ) {
+    if (!elements.minterRAMV0Interface) return;
+
+    // Show the interface
+    elements.minterRAMV0Interface.hidden = false;
+
+    try {
+      // Get auction details
+      const auctionDetails = await getAuctionDetails(
+        minterAddress,
+        coreContractAddress,
+        projectNumber
+      );
+      if (!auctionDetails) return;
+
+      // Determine auction state and timing
+      const now = Math.floor(Date.now() / 1000);
+      const startTime = Number(auctionDetails.auctionTimestampStart);
+      const endTime = Number(auctionDetails.auctionTimestampEnd);
+
+      let auctionState = "upcoming";
+      if (now >= startTime && now < endTime) {
+        auctionState = "live";
+      } else if (now >= endTime) {
+        auctionState = "completed";
+      }
+
+      // Calculate timing
+      const totalDurationSeconds = endTime - startTime;
+      const totalDurationText = formatDuration(totalDurationSeconds);
+
+      // Store auction times for countdown
+      state.auctionStartTime = startTime;
+      state.auctionEndTime = endTime;
+
+      // Update auction status
+      if (elements.auctionStatus) {
+        elements.auctionStatus.textContent =
+          auctionState.charAt(0).toUpperCase() + auctionState.slice(1);
+        elements.auctionStatus.className = `status-badge ${auctionState}`;
+      }
+
+      // Update timing displays
+      updateElement(elements.totalDuration, totalDurationText);
+
+      // Store current project info for refreshing
+      state.currentMinterAddress = minterAddress;
+      state.currentCoreAddress = coreContractAddress;
+      state.currentProjectNumber = projectNumber;
+
+      // Start countdown timer
+      startCountdownTimer();
+
+      // Start auto-refresh timer
+      startAutoRefresh();
+
+      // Update extra time badge text and style
+      if (elements.allowExtraTime) {
+        elements.allowExtraTime.hidden = false; // Always show the badge
+        elements.allowExtraTime.textContent = auctionDetails.allowExtraTime
+          ? "Extra Time Allowed"
+          : "Extra Time Not Allowed";
+
+        // Update CSS class for styling
+        if (auctionDetails.allowExtraTime) {
+          elements.allowExtraTime.className = "extra-time-badge allowed";
+        } else {
+          elements.allowExtraTime.className = "extra-time-badge not-allowed";
+        }
+      }
+
+      // Update auction overview stats
+      updateElement(
+        elements.numTokensInAuction,
+        auctionDetails.numTokensInAuction
+      );
+      updateElement(elements.numBids, auctionDetails.numBids);
+      updateElement(
+        elements.numBidsMintedTokens,
+        auctionDetails.numBidsMintedTokens
+      );
+      updateElement(
+        elements.numBidsErrorRefunded,
+        auctionDetails.numBidsErrorRefunded
+      );
+      updateElement(
+        elements.revenuesCollected,
+        auctionDetails.revenuesCollected ? "Yes" : "No"
+      );
+
+      // Get current minimum bid
+      const lowestBid = await getLowestBidValue(
+        minterAddress,
+        coreContractAddress,
+        projectNumber
+      );
+      updateElement(
+        elements.lowestBidValue,
+        lowestBid ? `${formatEth(lowestBid)} ETH` : "—"
+      );
+
+      // Get minimum next bid
+      const minNextBid = await getMinimumNextBid(
+        minterAddress,
+        coreContractAddress,
+        projectNumber
+      );
+      updateElement(
+        elements.minimumNextBid,
+        minNextBid ? `${formatEth(minNextBid)} ETH` : "—"
+      );
+    } catch (err) {
+      console.error("Failed to load MinterRAMV0 interface:", err);
+    }
+  }
+
+  async function getAuctionDetails(
+    minterAddress,
+    coreContractAddress,
+    projectNumber
+  ) {
+    if (!state.ethereum || !state.minterRAMV0Abi) return null;
+    try {
+      const getAuctionDetailsAbi = state.minterRAMV0Abi.find(
+        (item) => item.type === "function" && item.name === "getAuctionDetails"
+      );
+      if (!getAuctionDetailsAbi) return null;
+
+      const data = encodeFunctionData({
+        abi: [getAuctionDetailsAbi],
+        functionName: "getAuctionDetails",
+        args: [BigInt(projectNumber), coreContractAddress],
+      });
+
+      const result = await state.ethereum.request({
+        method: "eth_call",
+        params: [{ to: minterAddress, data }, "latest"],
+      });
+
+      const decoded = decodeFunctionResult({
+        abi: [getAuctionDetailsAbi],
+        functionName: "getAuctionDetails",
+        data: result,
+      });
+
+      // Map the flat array to a structured object
+      const auctionDetails = {
+        auctionTimestampStart: decoded[0],
+        auctionTimestampEnd: decoded[1],
+        basePrice: decoded[2],
+        numTokensInAuction: decoded[3],
+        numBids: decoded[4],
+        numBidsMintedTokens: decoded[5],
+        numBidsErrorRefunded: decoded[6],
+        minBidSlotIndex: decoded[7],
+        allowExtraTime: decoded[8],
+        adminArtistOnlyMintPeriodIfSellout: decoded[9],
+        revenuesCollected: decoded[10],
+        projectMinterState: decoded[11],
+      };
+
+      return auctionDetails;
+    } catch (err) {
+      console.warn("getAuctionDetails failed", err);
+      return null;
+    }
+  }
+
+  async function getLowestBidValue(
+    minterAddress,
+    coreContractAddress,
+    projectNumber
+  ) {
+    if (!state.ethereum || !state.minterRAMV0Abi) return null;
+    try {
+      const getLowestBidValueAbi = state.minterRAMV0Abi.find(
+        (item) => item.type === "function" && item.name === "getLowestBidValue"
+      );
+      if (!getLowestBidValueAbi) return null;
+
+      const data = encodeFunctionData({
+        abi: [getLowestBidValueAbi],
+        functionName: "getLowestBidValue",
+        args: [BigInt(projectNumber), coreContractAddress],
+      });
+
+      const result = await state.ethereum.request({
+        method: "eth_call",
+        params: [{ to: minterAddress, data }, "latest"],
+      });
+
+      const decoded = decodeFunctionResult({
+        abi: [getLowestBidValueAbi],
+        functionName: "getLowestBidValue",
+        data: result,
+      });
+
+      return decoded;
+    } catch (err) {
+      console.warn("getLowestBidValue failed", err);
+      return null;
+    }
+  }
+
+  async function getMinimumNextBid(
+    minterAddress,
+    coreContractAddress,
+    projectNumber
+  ) {
+    if (!state.ethereum || !state.minterRAMV0Abi) return null;
+    try {
+      const getMinimumNextBidAbi = state.minterRAMV0Abi.find(
+        (item) => item.type === "function" && item.name === "getMinimumNextBid"
+      );
+      if (!getMinimumNextBidAbi) return null;
+
+      const data = encodeFunctionData({
+        abi: [getMinimumNextBidAbi],
+        functionName: "getMinimumNextBid",
+        args: [BigInt(projectNumber), coreContractAddress],
+      });
+
+      const result = await state.ethereum.request({
+        method: "eth_call",
+        params: [{ to: minterAddress, data }, "latest"],
+      });
+
+      const decoded = decodeFunctionResult({
+        abi: [getMinimumNextBidAbi],
+        functionName: "getMinimumNextBid",
+        data: result,
+      });
+
+      // According to ABI, this returns [minNextBidValueInWei, minNextBidSlotIndex]
+      if (Array.isArray(decoded) && decoded.length >= 1) {
+        return decoded[0]; // Return just the bid value in wei
+      }
+
+      return decoded;
+    } catch (err) {
+      console.warn("getMinimumNextBid failed", err);
+      return null;
+    }
+  }
+
+  function updateElement(element, value) {
+    if (element) {
+      element.textContent =
+        value !== undefined && value !== null ? String(value) : "—";
+    }
+  }
+
+  function formatDuration(totalSeconds) {
+    if (totalSeconds <= 0) return "0s";
+
+    const days = Math.floor(totalSeconds / (24 * 60 * 60));
+    const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / (60 * 60));
+    const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+
+    const parts = [];
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
+    if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
+
+    return parts.join(" ");
+  }
+
+  function startCountdownTimer() {
+    // Clear any existing countdown
+    if (state.countdownInterval) {
+      clearInterval(state.countdownInterval);
+    }
+
+    // Update countdown every second
+    state.countdownInterval = setInterval(updateCountdown, 1000);
+
+    // Update immediately
+    updateCountdown();
+  }
+
+  function updateCountdown() {
+    if (
+      !elements.timeRemaining ||
+      !state.auctionStartTime ||
+      !state.auctionEndTime
+    )
+      return;
+
+    const now = Math.floor(Date.now() / 1000);
+    const startTime = state.auctionStartTime;
+    const endTime = state.auctionEndTime;
+
+    let timeRemainingText;
+    let auctionState;
+
+    if (now < startTime) {
+      // Upcoming
+      const timeToStart = startTime - now;
+      timeRemainingText = `Starts in ${formatDuration(timeToStart)}`;
+      auctionState = "upcoming";
+    } else if (now < endTime) {
+      // Live
+      const timeToEnd = endTime - now;
+      timeRemainingText = formatDuration(timeToEnd);
+      auctionState = "live";
+    } else {
+      // Completed
+      timeRemainingText = "Auction ended";
+      auctionState = "completed";
+      // Stop the countdown
+      if (state.countdownInterval) {
+        clearInterval(state.countdownInterval);
+        state.countdownInterval = null;
+      }
+    }
+
+    // Update time remaining
+    updateElement(elements.timeRemaining, timeRemainingText);
+
+    // Update status badge if it changed
+    if (elements.auctionStatus) {
+      const currentClass = elements.auctionStatus.className;
+      const newClass = `status-badge ${auctionState}`;
+      if (currentClass !== newClass) {
+        elements.auctionStatus.textContent =
+          auctionState.charAt(0).toUpperCase() + auctionState.slice(1);
+        elements.auctionStatus.className = newClass;
+      }
+    }
+  }
+
+  function startAutoRefresh() {
+    // Clear any existing refresh timers
+    if (state.refreshInterval) {
+      clearInterval(state.refreshInterval);
+    }
+    if (state.refreshCountdownInterval) {
+      clearInterval(state.refreshCountdownInterval);
+    }
+
+    let refreshCountdown = 30;
+
+    // Update refresh countdown every second
+    state.refreshCountdownInterval = setInterval(() => {
+      refreshCountdown--;
+      if (elements.refreshStatus) {
+        if (refreshCountdown > 0) {
+          elements.refreshStatus.textContent = `Refreshing in ${refreshCountdown}s`;
+        } else {
+          elements.refreshStatus.textContent = "Refreshing...";
+        }
+      }
+    }, 1000);
+
+    // Refresh minter data every 30 seconds
+    state.refreshInterval = setInterval(async () => {
+      if (
+        state.currentMinterAddress &&
+        state.currentCoreAddress &&
+        state.currentProjectNumber !== null
+      ) {
+        await refreshMinterData();
+        refreshCountdown = 30; // Reset countdown
+      }
+    }, 30000);
+
+    // Set initial countdown display
+    if (elements.refreshStatus) {
+      elements.refreshStatus.textContent = `Refreshing in ${refreshCountdown}s`;
+    }
+  }
+
+  async function refreshMinterData() {
+    if (
+      !state.currentMinterAddress ||
+      !state.currentCoreAddress ||
+      state.currentProjectNumber === null
+    )
+      return;
+
+    try {
+      // Get fresh auction details
+      const auctionDetails = await getAuctionDetails(
+        state.currentMinterAddress,
+        state.currentCoreAddress,
+        state.currentProjectNumber
+      );
+      if (!auctionDetails) return;
+
+      // Update auction overview stats
+      updateElement(
+        elements.numTokensInAuction,
+        auctionDetails.numTokensInAuction
+      );
+      updateElement(elements.numBids, auctionDetails.numBids);
+      updateElement(
+        elements.numBidsMintedTokens,
+        auctionDetails.numBidsMintedTokens
+      );
+      updateElement(
+        elements.numBidsErrorRefunded,
+        auctionDetails.numBidsErrorRefunded
+      );
+      updateElement(
+        elements.revenuesCollected,
+        auctionDetails.revenuesCollected ? "Yes" : "No"
+      );
+
+      // Get fresh bid values
+      const lowestBid = await getLowestBidValue(
+        state.currentMinterAddress,
+        state.currentCoreAddress,
+        state.currentProjectNumber
+      );
+      updateElement(
+        elements.lowestBidValue,
+        lowestBid ? `${formatEth(lowestBid)} ETH` : "—"
+      );
+
+      const minNextBid = await getMinimumNextBid(
+        state.currentMinterAddress,
+        state.currentCoreAddress,
+        state.currentProjectNumber
+      );
+      updateElement(
+        elements.minimumNextBid,
+        minNextBid ? `${formatEth(minNextBid)} ETH` : "—"
+      );
+    } catch (err) {
+      console.warn("Failed to refresh minter data", err);
     }
   }
 })();
