@@ -88,11 +88,35 @@
 
             <div class="actions">
               <button id="loadProject" class="button" type="button" disabled>
-                Load Project (TODO)
+                Load Project
               </button>
             </div>
           </fieldset>
         </form>
+
+        <div id="minterInfo" class="minter-info" hidden>
+          <h3>Minter Information</h3>
+          <dl class="info-grid">
+            <div>
+              <dt>Minter Address</dt>
+              <dd id="minterAddress">—</dd>
+            </div>
+            <div>
+              <dt>Minter Type</dt>
+              <dd id="minterType">—</dd>
+            </div>
+          </dl>
+          <div id="minterTodoArea" class="minter-todo">
+            <p>
+              TODO: Implement minter-specific interface based on type and
+              project.
+            </p>
+          </div>
+        </div>
+
+        <div id="minterError" class="alert" hidden>
+          <span id="minterErrorText"></span>
+        </div>
       </section>
 
       <section class="card muted" aria-labelledby="notes-heading">

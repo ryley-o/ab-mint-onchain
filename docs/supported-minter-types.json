@@ -1,0 +1,8 @@
+{
+  "1": {
+    "supportedMinterTypes": ["MinterRAMV0"]
+  },
+  "11155111": {
+    "supportedMinterTypes": ["MinterRAMV0"]
+  }
+}
