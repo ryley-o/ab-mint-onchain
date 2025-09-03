@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="Art Blocks on-chain minter (experimental)"
+    />
+    <title>AB On‑chain Minter (Experimental)</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <noscript>
+      This site requires JavaScript to connect to your wallet.
+    </noscript>
+
+    <header class="site-header">
+      <h1>Art Blocks On‑chain Minter</h1>
+      <p class="tagline">Connect your wallet and mint directly from chain.</p>
+    </header>
+
+    <main class="container">
+      <section class="card" aria-labelledby="wallet-heading">
+        <div class="card-header">
+          <h2 id="wallet-heading">Wallet</h2>
+          <div class="status" id="connectionStatus" data-status="disconnected">
+            <span class="dot" aria-hidden="true"></span>
+            <span id="statusText">Not connected</span>
+          </div>
+        </div>
+
+        <div class="wallet-actions">
+          <button id="connectButton" class="button primary">
+            Connect Wallet
+          </button>
+        </div>
+
+        <div id="noProvider" class="alert" hidden>
+          No injected wallet detected. Install a wallet like
+          <a
+            href="https://metamask.io"
+            target="_blank"
+            rel="noreferrer noopener"
+            >MetaMask</a
+          >
+          and reload.
+        </div>
+
+        <dl class="info-grid">
+          <div>
+            <dt>Account</dt>
+            <dd id="accountDisplay">—</dd>
+          </div>
+          <div>
+            <dt>Network</dt>
+            <dd id="chainDisplay">—</dd>
+          </div>
+          <div>
+            <dt>Balance</dt>
+            <dd id="balanceDisplay">—</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="card" aria-labelledby="minter-heading">
+        <div class="card-header">
+          <h2 id="minter-heading">Minter</h2>
+          <span class="badge" id="minterStatus">Disconnected</span>
+        </div>
+
+        <form id="minterForm">
+          <fieldset id="minterFieldset" disabled>
+            <div id="networkWarning" class="alert" hidden>
+              Unsupported network. Please switch to Ethereum Mainnet or Sepolia.
+            </div>
+
+            <label for="projectSelect">Select Project</label>
+            <select id="projectSelect" name="projectId">
+              <option value="" selected disabled>— Choose a project —</option>
+            </select>
+
+            <div class="help">
+              Projects are loaded from a local list per network. Mainnet is
+              currently empty; Sepolia includes sample projects.
+            </div>
+
+            <div class="actions">
+              <button id="loadProject" class="button" type="button" disabled>
+                Load Project (TODO)
+              </button>
+            </div>
+          </fieldset>
+        </form>
+      </section>
+
+      <section class="card muted" aria-labelledby="notes-heading">
+        <h2 id="notes-heading">Notes</h2>
+        <ul>
+          <li>
+            This prototype uses only your wallet's injected RPC (EIP‑1193
+            provider).
+          </li>
+          <li>Switch networks/accounts in your wallet to see live updates.</li>
+          <li>Minting logic and project discovery will be implemented next.</li>
+        </ul>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <small>
+        Built for GitHub Pages. Experimental; use at your own risk.
+      </small>
+    </footer>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
