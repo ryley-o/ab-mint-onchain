@@ -1,6 +1,8 @@
 import {
   encodeFunctionData,
   decodeFunctionResult,
+  keccak256,
+  toHex,
 } from "https://esm.sh/viem@2.21.1";
 
 (() => {
@@ -53,6 +55,21 @@ import {
     experimentalBanner: null,
     acceptDisclaimer: null,
     rejectDisclaimer: null,
+    loadMyBidsButton: null,
+    bidScanStatus: null,
+    myBidsContainer: null,
+    myBidsList: null,
+    bidTopupSection: null,
+    selectedBidInfo: null,
+    topupSlotIndex: null,
+    topupBidValue: null,
+    topupBidButton: null,
+    topupSlotDecrease10: null,
+    topupSlotDecrease1: null,
+    topupSlotIncrease1: null,
+    topupSlotIncrease10: null,
+    topupSuccess: null,
+    topupTxLink: null,
   };
 
   /** wallet state */
@@ -78,6 +95,10 @@ import {
     currentSlotIndex: 0,
     minimumSlotIndex: 0,
     currentBidValueWei: null,
+    userBids: [],
+    selectedBid: null,
+    topupSlotIndex: 0,
+    topupBidValueWei: null,
   };
 
   document.addEventListener("DOMContentLoaded", init);
@@ -135,6 +156,25 @@ import {
     elements.experimentalBanner = document.getElementById("experimentalBanner");
     elements.acceptDisclaimer = document.getElementById("acceptDisclaimer");
     elements.rejectDisclaimer = document.getElementById("rejectDisclaimer");
+    elements.loadMyBidsButton = document.getElementById("loadMyBidsButton");
+    elements.bidScanStatus = document.getElementById("bidScanStatus");
+    elements.myBidsContainer = document.getElementById("myBidsContainer");
+    elements.myBidsList = document.getElementById("myBidsList");
+    elements.bidTopupSection = document.getElementById("bidTopupSection");
+    elements.selectedBidInfo = document.getElementById("selectedBidInfo");
+    elements.topupSlotIndex = document.getElementById("topupSlotIndex");
+    elements.topupBidValue = document.getElementById("topupBidValue");
+    elements.topupBidButton = document.getElementById("topupBidButton");
+    elements.topupSlotDecrease10 = document.getElementById(
+      "topupSlotDecrease10"
+    );
+    elements.topupSlotDecrease1 = document.getElementById("topupSlotDecrease1");
+    elements.topupSlotIncrease1 = document.getElementById("topupSlotIncrease1");
+    elements.topupSlotIncrease10 = document.getElementById(
+      "topupSlotIncrease10"
+    );
+    elements.topupSuccess = document.getElementById("topupSuccess");
+    elements.topupTxLink = document.getElementById("topupTxLink");
 
     // Only check disclaimer status if we have the elements
     if (elements.disclaimerModal && elements.experimentalBanner) {
@@ -164,6 +204,20 @@ import {
     elements.createBidButton?.addEventListener("click", createBid);
     elements.acceptDisclaimer?.addEventListener("click", acceptDisclaimer);
     elements.rejectDisclaimer?.addEventListener("click", rejectDisclaimer);
+    elements.loadMyBidsButton?.addEventListener("click", loadMyBids);
+    elements.topupSlotDecrease10?.addEventListener("click", () =>
+      adjustTopupSlotIndex(-10)
+    );
+    elements.topupSlotDecrease1?.addEventListener("click", () =>
+      adjustTopupSlotIndex(-1)
+    );
+    elements.topupSlotIncrease1?.addEventListener("click", () =>
+      adjustTopupSlotIndex(1)
+    );
+    elements.topupSlotIncrease10?.addEventListener("click", () =>
+      adjustTopupSlotIndex(10)
+    );
+    elements.topupBidButton?.addEventListener("click", topupBid);
 
     // detect provider
     if (typeof window !== "undefined" && window.ethereum) {
@@ -1522,6 +1576,513 @@ import {
     }
   }
 
+  async function loadMyBids() {
+    if (
+      !state.account ||
+      !state.currentMinterAddress ||
+      !state.currentCoreAddress ||
+      state.currentProjectNumber === null
+    ) {
+      updateScanStatus("Connect wallet and load project first");
+      return;
+    }
+
+    if (!state.auctionStartTime) {
+      updateScanStatus("Auction data not loaded");
+      return;
+    }
+
+    try {
+      updateScanStatus("Scanning blockchain logs...");
+
+      // Get current block number
+      const currentBlockHex = await state.ethereum.request({
+        method: "eth_blockNumber",
+      });
+      const currentBlock = parseInt(currentBlockHex, 16);
+
+      // Get block number for auction start (approximate)
+      const auctionStartBlock = await getBlockNumberFromTimestamp(
+        state.auctionStartTime
+      );
+
+      console.log("Block range for scanning:", {
+        auctionStartTime: state.auctionStartTime,
+        auctionStartBlock,
+        currentBlock,
+        totalBlocks: currentBlock - auctionStartBlock,
+      });
+
+      updateScanStatus(
+        `Scanning blocks ${auctionStartBlock} to ${currentBlock}...`
+      );
+
+      // Scan logs in chunks of 10k blocks
+      const userBids = await scanBidLogs(auctionStartBlock, currentBlock);
+
+      console.log("Final processed user bids:", userBids);
+      updateScanStatus(`Found ${userBids.length} active bids`);
+      state.userBids = userBids;
+
+      displayUserBids(userBids);
+    } catch (err) {
+      console.error("Failed to load user bids", err);
+      updateScanStatus("Failed to scan bids");
+    }
+  }
+
+  async function getBlockNumberFromTimestamp(timestamp) {
+    // Rough estimate: 12 seconds per block average
+    const currentTime = Math.floor(Date.now() / 1000);
+    const timeDiff = currentTime - timestamp;
+    const estimatedBlocks = Math.floor(timeDiff / 12);
+
+    const currentBlockHex = await state.ethereum.request({
+      method: "eth_blockNumber",
+    });
+    const currentBlock = parseInt(currentBlockHex, 16);
+
+    return Math.max(currentBlock - estimatedBlocks, 0);
+  }
+
+  async function scanBidLogs(fromBlock, toBlock) {
+    const allBids = new Map(); // bidId -> bid data
+    const processedBlocks = new Set(); // Track processed blocks to avoid duplicates
+    const chunkSize = 10000;
+    const maxLogsThreshold = 500;
+
+    let currentStart = fromBlock;
+
+    while (currentStart <= toBlock) {
+      const end = Math.min(currentStart + chunkSize - 1, toBlock);
+      updateScanStatus(`Scanning blocks ${currentStart} to ${end}...`);
+
+      // Scan for BidCreated events
+      const bidCreatedLogs = await getBidCreatedLogs(currentStart, end);
+      console.log(`BidCreated logs (${currentStart}-${end}):`, bidCreatedLogs);
+
+      bidCreatedLogs.forEach((log) => {
+        const blockKey = `created-${log.blockNumber}-${log.transactionIndex}-${log.logIndex}`;
+        if (!processedBlocks.has(blockKey)) {
+          processedBlocks.add(blockKey);
+          console.log("Processing BidCreated log:", log);
+          console.log(
+            "Comparing bidder:",
+            log.bidder.toLowerCase(),
+            "vs account:",
+            state.account.toLowerCase()
+          );
+          if (log.bidder.toLowerCase() === state.account.toLowerCase()) {
+            console.log("Adding bid to allBids:", log.bidId);
+            allBids.set(log.bidId, {
+              bidId: log.bidId,
+              slotIndex: log.slotIndex,
+              bidder: log.bidder,
+              isRemoved: false,
+            });
+          }
+        }
+      });
+
+      // Scan for BidRemoved events
+      const bidRemovedLogs = await getBidRemovedLogs(currentStart, end);
+      console.log(`BidRemoved logs (${currentStart}-${end}):`, bidRemovedLogs);
+      bidRemovedLogs.forEach((log) => {
+        const blockKey = `removed-${log.blockNumber}-${log.transactionIndex}-${log.logIndex}`;
+        if (!processedBlocks.has(blockKey) && allBids.has(log.bidId)) {
+          processedBlocks.add(blockKey);
+          console.log("Marking bid as removed:", log.bidId);
+          allBids.get(log.bidId).isRemoved = true;
+        }
+      });
+
+      // Scan for BidToppedUp events
+      const bidToppedUpLogs = await getBidToppedUpLogs(currentStart, end);
+      console.log(
+        `BidToppedUp logs (${currentStart}-${end}):`,
+        bidToppedUpLogs
+      );
+      bidToppedUpLogs.forEach((log) => {
+        const blockKey = `toppedup-${log.blockNumber}-${log.transactionIndex}-${log.logIndex}`;
+        if (!processedBlocks.has(blockKey) && allBids.has(log.bidId)) {
+          processedBlocks.add(blockKey);
+          console.log(
+            "Updating bid slot index:",
+            log.bidId,
+            "to",
+            log.newSlotIndex
+          );
+          allBids.get(log.bidId).slotIndex = log.newSlotIndex;
+        }
+      });
+
+      // Smart advancement: if we got too many logs, advance more carefully
+      const totalLogs =
+        bidCreatedLogs.length + bidRemovedLogs.length + bidToppedUpLogs.length;
+      console.log(`Total logs in chunk: ${totalLogs}`);
+
+      if (totalLogs > maxLogsThreshold) {
+        // Find the highest block number in this chunk's logs
+        const allLogs = [
+          ...bidCreatedLogs,
+          ...bidRemovedLogs,
+          ...bidToppedUpLogs,
+        ];
+        const maxBlockInChunk = Math.max(
+          ...allLogs.map((log) => parseInt(log.blockNumber, 16))
+        );
+        console.log(
+          `High log count (${totalLogs}), advancing to block ${maxBlockInChunk + 1} instead of ${end + 1}`
+        );
+        currentStart = maxBlockInChunk + 1;
+      } else {
+        currentStart = end + 1;
+      }
+    }
+
+    console.log("scanBidLogs summary:", {
+      totalBidsFound: allBids.size,
+      allBidsMap: Array.from(allBids.entries()),
+      connectedAccount: state.account,
+    });
+
+    // Return only active (non-removed) bids
+    const activeBids = Array.from(allBids.values()).filter(
+      (bid) => !bid.isRemoved
+    );
+    console.log("Active bids after filtering:", activeBids);
+    return activeBids;
+  }
+
+  async function getBidCreatedLogs(fromBlock, toBlock) {
+    console.log("getBidCreatedLogs params:", {
+      fromBlock: "0x" + fromBlock.toString(16),
+      toBlock: "0x" + toBlock.toString(16),
+      address: state.currentMinterAddress,
+      projectId:
+        "0x" + state.currentProjectNumber.toString(16).padStart(64, "0"),
+      coreContract:
+        "0x" +
+        state.currentCoreAddress.slice(2).toLowerCase().padStart(64, "0"),
+      eventSig: keccak256(
+        toHex("BidCreated(uint256,address,uint256,uint256,address)")
+      ),
+    });
+
+    const logs = await state.ethereum.request({
+      method: "eth_getLogs",
+      params: [
+        {
+          fromBlock: "0x" + fromBlock.toString(16),
+          toBlock: "0x" + toBlock.toString(16),
+          address: state.currentMinterAddress,
+          topics: [
+            keccak256(
+              toHex("BidCreated(uint256,address,uint256,uint256,address)")
+            ),
+            "0x" + state.currentProjectNumber.toString(16).padStart(64, "0"),
+            "0x" +
+              state.currentCoreAddress.slice(2).toLowerCase().padStart(64, "0"),
+          ],
+        },
+      ],
+    });
+
+    console.log(`Raw BidCreated logs (${fromBlock}-${toBlock}):`, logs);
+
+    const parsedLogs = logs.map((log) => {
+      const parsed = {
+        slotIndex: parseInt(log.data.slice(2, 66), 16), // First 32 bytes
+        bidId: parseInt(log.data.slice(66, 130), 16), // Second 32 bytes
+        bidder: "0x" + log.data.slice(154, 194), // Third 32 bytes (address is last 20 bytes)
+        blockNumber: log.blockNumber,
+        transactionIndex: log.transactionIndex,
+        logIndex: log.logIndex,
+      };
+      console.log("Parsed BidCreated log:", parsed);
+      return parsed;
+    });
+
+    return parsedLogs;
+  }
+
+  async function getBidRemovedLogs(fromBlock, toBlock) {
+    const logs = await state.ethereum.request({
+      method: "eth_getLogs",
+      params: [
+        {
+          fromBlock: "0x" + fromBlock.toString(16),
+          toBlock: "0x" + toBlock.toString(16),
+          address: state.currentMinterAddress,
+          topics: [
+            keccak256(toHex("BidRemoved(uint256,address,uint256)")),
+            "0x" + state.currentProjectNumber.toString(16).padStart(64, "0"),
+            "0x" +
+              state.currentCoreAddress.slice(2).toLowerCase().padStart(64, "0"),
+          ],
+        },
+      ],
+    });
+
+    console.log(`Raw BidRemoved logs (${fromBlock}-${toBlock}):`, logs);
+
+    return logs.map((log) => {
+      const parsed = {
+        bidId: parseInt(log.data.slice(2, 66), 16), // First 32 bytes in data
+        blockNumber: log.blockNumber,
+        transactionIndex: log.transactionIndex,
+        logIndex: log.logIndex,
+      };
+      console.log("Parsed BidRemoved log:", parsed);
+      return parsed;
+    });
+  }
+
+  async function getBidToppedUpLogs(fromBlock, toBlock) {
+    const logs = await state.ethereum.request({
+      method: "eth_getLogs",
+      params: [
+        {
+          fromBlock: "0x" + fromBlock.toString(16),
+          toBlock: "0x" + toBlock.toString(16),
+          address: state.currentMinterAddress,
+          topics: [
+            keccak256(toHex("BidToppedUp(uint256,address,uint256,uint256)")),
+            "0x" + state.currentProjectNumber.toString(16).padStart(64, "0"),
+            "0x" +
+              state.currentCoreAddress.slice(2).toLowerCase().padStart(64, "0"),
+          ],
+        },
+      ],
+    });
+
+    console.log(`Raw BidToppedUp logs (${fromBlock}-${toBlock}):`, logs);
+
+    return logs.map((log) => {
+      const parsed = {
+        bidId: parseInt(log.data.slice(2, 66), 16), // First 32 bytes in data
+        newSlotIndex: parseInt(log.data.slice(66, 130), 16), // Second 32 bytes in data
+        blockNumber: log.blockNumber,
+        transactionIndex: log.transactionIndex,
+        logIndex: log.logIndex,
+      };
+      console.log("Parsed BidToppedUp log:", parsed);
+      return parsed;
+    });
+  }
+
+  function updateScanStatus(message) {
+    if (elements.bidScanStatus) {
+      elements.bidScanStatus.textContent = message;
+    }
+  }
+
+  async function displayUserBids(bids) {
+    if (!elements.myBidsList || !elements.myBidsContainer) return;
+
+    elements.myBidsList.innerHTML = "";
+
+    if (bids.length === 0) {
+      elements.myBidsContainer.hidden = true;
+      return;
+    }
+
+    elements.myBidsContainer.hidden = false;
+
+    // Get bid values for all bids
+    for (const bid of bids) {
+      const bidValue = await getSlotIndexToBidValue(
+        state.currentMinterAddress,
+        state.currentCoreAddress,
+        state.currentProjectNumber,
+        bid.slotIndex
+      );
+
+      const bidElement = document.createElement("div");
+      bidElement.className = "bid-item";
+      bidElement.innerHTML = `
+        <div class="bid-info">
+          <div class="bid-id">Bid #${bid.bidId}</div>
+          <div class="bid-details">Slot ${bid.slotIndex} | ${bidValue ? formatEth(bidValue) + " ETH" : "—"}</div>
+        </div>
+      `;
+
+      bidElement.addEventListener("click", () => selectBid(bid));
+      elements.myBidsList.appendChild(bidElement);
+    }
+  }
+
+  function selectBid(bid) {
+    // Update selected bid
+    state.selectedBid = bid;
+
+    // Update UI selection
+    document.querySelectorAll(".bid-item").forEach((item) => {
+      item.classList.remove("selected");
+    });
+    event.target.closest(".bid-item").classList.add("selected");
+
+    // Show topup section
+    if (elements.bidTopupSection) {
+      elements.bidTopupSection.hidden = false;
+    }
+
+    // Set initial topup slot to current + 1
+    state.topupSlotIndex = bid.slotIndex + 1;
+
+    // Update displays
+    updateSelectedBidInfo();
+    updateTopupDisplay();
+  }
+
+  function updateSelectedBidInfo() {
+    if (!state.selectedBid || !elements.selectedBidInfo) return;
+    elements.selectedBidInfo.textContent = `Bid #${state.selectedBid.bidId} (Slot ${state.selectedBid.slotIndex})`;
+  }
+
+  async function updateTopupDisplay() {
+    if (!state.selectedBid) return;
+
+    // Update slot index display
+    if (elements.topupSlotIndex) {
+      elements.topupSlotIndex.textContent = state.topupSlotIndex;
+    }
+
+    // Update button states
+    updateTopupSlotButtons();
+
+    // Get bid value for current bid slot
+    const currentBidValue = await getSlotIndexToBidValue(
+      state.currentMinterAddress,
+      state.currentCoreAddress,
+      state.currentProjectNumber,
+      state.selectedBid.slotIndex
+    );
+
+    // Get bid value for new topup slot
+    const newBidValue = await getSlotIndexToBidValue(
+      state.currentMinterAddress,
+      state.currentCoreAddress,
+      state.currentProjectNumber,
+      state.topupSlotIndex
+    );
+
+    if (newBidValue && currentBidValue) {
+      // Calculate the difference (additional amount needed)
+      const additionalAmount = newBidValue - currentBidValue;
+      state.topupBidValueWei = additionalAmount;
+
+      updateElement(
+        elements.topupBidValue,
+        `+${formatEth(additionalAmount)} ETH`
+      );
+
+      if (elements.topupBidButton) {
+        elements.topupBidButton.disabled = additionalAmount <= 0;
+      }
+    } else {
+      state.topupBidValueWei = null;
+      updateElement(elements.topupBidValue, "—");
+      if (elements.topupBidButton) {
+        elements.topupBidButton.disabled = true;
+      }
+    }
+  }
+
+  async function adjustTopupSlotIndex(delta) {
+    if (!state.selectedBid) return;
+
+    let newSlotIndex = state.topupSlotIndex + delta;
+
+    // Clamp to valid bounds (must be greater than current bid slot)
+    const minSlot = state.selectedBid.slotIndex + 1;
+    if (newSlotIndex < minSlot) {
+      newSlotIndex = minSlot;
+    } else if (newSlotIndex > 511) {
+      newSlotIndex = 511;
+    }
+
+    state.topupSlotIndex = newSlotIndex;
+    await updateTopupDisplay();
+  }
+
+  function updateTopupSlotButtons() {
+    if (!state.selectedBid) return;
+
+    const minSlot = state.selectedBid.slotIndex + 1;
+    const canDecrease1 = state.topupSlotIndex > minSlot;
+    const canDecrease10 = state.topupSlotIndex > minSlot;
+    const canIncrease1 = state.topupSlotIndex < 511;
+    const canIncrease10 = state.topupSlotIndex < 511;
+
+    if (elements.topupSlotDecrease1)
+      elements.topupSlotDecrease1.disabled = !canDecrease1;
+    if (elements.topupSlotDecrease10)
+      elements.topupSlotDecrease10.disabled = !canDecrease10;
+    if (elements.topupSlotIncrease1)
+      elements.topupSlotIncrease1.disabled = !canIncrease1;
+    if (elements.topupSlotIncrease10)
+      elements.topupSlotIncrease10.disabled = !canIncrease10;
+  }
+
+  async function topupBid() {
+    if (
+      !state.selectedBid ||
+      !state.topupBidValueWei ||
+      !state.ethereum ||
+      !state.minterRAMV0Abi
+    ) {
+      return;
+    }
+
+    try {
+      hideTopupSuccess();
+
+      const topUpBidAbi = state.minterRAMV0Abi.find(
+        (item) => item.type === "function" && item.name === "topUpBid"
+      );
+      if (!topUpBidAbi) {
+        console.error("topUpBid function not found in ABI");
+        return;
+      }
+
+      const data = encodeFunctionData({
+        abi: [topUpBidAbi],
+        functionName: "topUpBid",
+        args: [
+          BigInt(state.currentProjectNumber),
+          state.currentCoreAddress,
+          BigInt(state.selectedBid.bidId),
+          state.topupSlotIndex,
+        ],
+      });
+
+      const txHash = await state.ethereum.request({
+        method: "eth_sendTransaction",
+        params: [
+          {
+            from: state.account,
+            to: state.currentMinterAddress,
+            data: data,
+            value: "0x" + state.topupBidValueWei.toString(16),
+          },
+        ],
+      });
+
+      console.log("Top-up transaction sent:", txHash);
+      showTopupSuccess(txHash);
+
+      // Refresh bids after successful topup (wait longer for mining)
+      setTimeout(() => {
+        console.log("Refreshing bids after top-up transaction");
+        loadMyBids();
+      }, 15000);
+    } catch (err) {
+      console.error("topupBid failed", err);
+      showBidError(err.message || "Failed to top up bid");
+    }
+  }
+
   function showBidSuccess(txHash) {
     if (elements.txLink && elements.bidSuccess) {
       const etherscanUrl = getEtherscanUrl(txHash);
@@ -1533,6 +2094,20 @@ import {
   function hideBidSuccess() {
     if (elements.bidSuccess) {
       elements.bidSuccess.hidden = true;
+    }
+  }
+
+  function showTopupSuccess(txHash) {
+    if (elements.topupTxLink && elements.topupSuccess) {
+      const etherscanUrl = getEtherscanUrl(txHash);
+      elements.topupTxLink.href = etherscanUrl;
+      elements.topupSuccess.hidden = false;
+    }
+  }
+
+  function hideTopupSuccess() {
+    if (elements.topupSuccess) {
+      elements.topupSuccess.hidden = true;
     }
   }
 

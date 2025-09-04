@@ -504,6 +504,110 @@ select {
   margin-top: 1rem;
 }
 
+.bid-tracking-section {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.bid-tracking-section h5 {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bid-tracking-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.scan-status {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+}
+
+.my-bids-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.bid-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: rgba(79, 70, 229, 0.05);
+  border: 1px solid rgba(79, 70, 229, 0.15);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.bid-item:hover {
+  background: rgba(79, 70, 229, 0.08);
+}
+
+.bid-item.selected {
+  background: rgba(79, 70, 229, 0.12);
+  border-color: rgba(79, 70, 229, 0.3);
+}
+
+.bid-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.bid-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.bid-details {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.bid-topup-section {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: rgba(34, 197, 94, 0.05);
+  border: 1px solid rgba(34, 197, 94, 0.15);
+  border-radius: 8px;
+}
+
+.bid-topup-section h6 {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+}
+
+.topup-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.current-bid-info label,
+.topup-controls label,
+.topup-value label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0 0 0.5rem;
+}
+
+.topup-actions {
+  margin-top: 1rem;
+}
+
 .site-footer {
   text-align: center;
   padding: 2rem 1rem 3rem;

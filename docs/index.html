@@ -264,6 +264,93 @@
                 <span id="bidErrorText"></span>
               </div>
             </div>
+
+            <div class="bid-tracking-section">
+              <h5>My Bids</h5>
+              <div class="bid-tracking-actions">
+                <button id="loadMyBidsButton" class="button" type="button">
+                  Load My Bids
+                </button>
+                <span id="bidScanStatus" class="scan-status"
+                  >Ready to scan</span
+                >
+              </div>
+
+              <div id="myBidsContainer" class="my-bids-container" hidden>
+                <div id="myBidsList" class="my-bids-list">
+                  <!-- Bids will be populated here -->
+                </div>
+              </div>
+
+              <div id="bidTopupSection" class="bid-topup-section" hidden>
+                <h6>Top Up Selected Bid</h6>
+                <div class="topup-info">
+                  <div class="current-bid-info">
+                    <label>Current Bid</label>
+                    <span id="selectedBidInfo">—</span>
+                  </div>
+                  <div class="topup-controls">
+                    <label>New Slot Index</label>
+                    <div class="slot-input-group">
+                      <button
+                        id="topupSlotDecrease10"
+                        class="slot-btn"
+                        type="button"
+                      >
+                        --
+                      </button>
+                      <button
+                        id="topupSlotDecrease1"
+                        class="slot-btn"
+                        type="button"
+                      >
+                        -
+                      </button>
+                      <span id="topupSlotIndex" class="slot-display">0</span>
+                      <button
+                        id="topupSlotIncrease1"
+                        class="slot-btn"
+                        type="button"
+                      >
+                        +
+                      </button>
+                      <button
+                        id="topupSlotIncrease10"
+                        class="slot-btn"
+                        type="button"
+                      >
+                        ++
+                      </button>
+                    </div>
+                  </div>
+                  <div class="topup-value">
+                    <label>Additional Amount</label>
+                    <span id="topupBidValue" class="bid-amount">—</span>
+                  </div>
+                </div>
+                <div class="topup-actions">
+                  <button
+                    id="topupBidButton"
+                    class="button primary"
+                    type="button"
+                    disabled
+                  >
+                    Top Up Bid
+                  </button>
+                </div>
+
+                <div id="topupSuccess" class="success-alert" hidden>
+                  <span>✅ Bid topped up successfully! </span>
+                  <a
+                    id="topupTxLink"
+                    href="#"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >View on Etherscan</a
+                  >
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
