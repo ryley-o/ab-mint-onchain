@@ -32,6 +32,68 @@ body {
   line-height: 1.5;
 }
 
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 500px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-content h2 {
+  margin: 0 0 1rem;
+  color: #f59e0b;
+}
+
+.disclaimer-text {
+  margin-bottom: 1.5rem;
+}
+
+.disclaimer-text ul {
+  margin: 1rem 0;
+  padding-left: 1.5rem;
+}
+
+.disclaimer-text li {
+  margin-bottom: 0.5rem;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.experimental-banner {
+  background: linear-gradient(
+    135deg,
+    rgba(245, 158, 11, 0.1),
+    rgba(239, 68, 68, 0.1)
+  );
+  border-bottom: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 0.75rem 1rem;
+  text-align: center;
+  color: #f59e0b;
+  font-size: 0.9rem;
+}
+
 .site-header {
   padding: 2rem 1rem 1rem;
   text-align: center;
@@ -45,6 +107,13 @@ body {
 .tagline {
   color: var(--muted);
   margin: 0;
+}
+
+.warning-subtitle {
+  color: #f59e0b;
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .container {
@@ -164,6 +233,21 @@ select {
   padding: 0.6rem 0.75rem;
   border-radius: 8px;
   margin: 0.5rem 0;
+}
+
+.success-alert {
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  margin: 0.5rem 0;
+  color: var(--accent);
+}
+
+.success-alert a {
+  color: var(--accent);
+  text-decoration: underline;
+  font-weight: 600;
 }
 
 .badge {
@@ -336,6 +420,88 @@ select {
     "Liberation Mono", "Courier New", monospace;
   font-size: 0.9rem;
   font-weight: 600;
+}
+
+.bidding-section {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.bidding-section h5 {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bid-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.slot-controls label,
+.bid-value label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0 0 0.5rem;
+}
+
+.slot-input-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem;
+}
+
+.slot-btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  min-width: 32px;
+}
+
+.slot-btn:hover:not(:disabled) {
+  background: rgba(79, 70, 229, 0.1);
+  border-color: var(--primary);
+}
+
+.slot-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.slot-display {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-weight: 600;
+  font-size: 1rem;
+  min-width: 60px;
+  text-align: center;
+}
+
+.bid-amount {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.bid-actions {
+  margin-top: 1rem;
 }
 
 .site-footer {

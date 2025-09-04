@@ -38,6 +38,21 @@ import {
     totalDuration: null,
     timeRemaining: null,
     refreshStatus: null,
+    currentSlotIndex: null,
+    currentBidValue: null,
+    createBidButton: null,
+    bidError: null,
+    bidErrorText: null,
+    bidSuccess: null,
+    txLink: null,
+    slotDecrease10: null,
+    slotDecrease1: null,
+    slotIncrease1: null,
+    slotIncrease10: null,
+    disclaimerModal: null,
+    experimentalBanner: null,
+    acceptDisclaimer: null,
+    rejectDisclaimer: null,
   };
 
   /** wallet state */
@@ -60,6 +75,9 @@ import {
     currentMinterAddress: null,
     currentCoreAddress: null,
     currentProjectNumber: null,
+    currentSlotIndex: 0,
+    minimumSlotIndex: 0,
+    currentBidValueWei: null,
   };
 
   document.addEventListener("DOMContentLoaded", init);
@@ -102,6 +120,26 @@ import {
     elements.totalDuration = document.getElementById("totalDuration");
     elements.timeRemaining = document.getElementById("timeRemaining");
     elements.refreshStatus = document.getElementById("refreshStatus");
+    elements.currentSlotIndex = document.getElementById("currentSlotIndex");
+    elements.currentBidValue = document.getElementById("currentBidValue");
+    elements.createBidButton = document.getElementById("createBidButton");
+    elements.bidError = document.getElementById("bidError");
+    elements.bidErrorText = document.getElementById("bidErrorText");
+    elements.bidSuccess = document.getElementById("bidSuccess");
+    elements.txLink = document.getElementById("txLink");
+    elements.slotDecrease10 = document.getElementById("slotDecrease10");
+    elements.slotDecrease1 = document.getElementById("slotDecrease1");
+    elements.slotIncrease1 = document.getElementById("slotIncrease1");
+    elements.slotIncrease10 = document.getElementById("slotIncrease10");
+    elements.disclaimerModal = document.getElementById("disclaimerModal");
+    elements.experimentalBanner = document.getElementById("experimentalBanner");
+    elements.acceptDisclaimer = document.getElementById("acceptDisclaimer");
+    elements.rejectDisclaimer = document.getElementById("rejectDisclaimer");
+
+    // Only check disclaimer status if we have the elements
+    if (elements.disclaimerModal && elements.experimentalBanner) {
+      checkDisclaimerStatus();
+    }
     if (elements.projectSelect) {
       elements.projectSelect.addEventListener("change", () => {
         if (elements.loadProjectButton) {
@@ -113,6 +151,19 @@ import {
     // wire events
     elements.connectButton?.addEventListener("click", connectWallet);
     elements.loadProjectButton?.addEventListener("click", loadProjectDetails);
+    elements.slotDecrease10?.addEventListener("click", () =>
+      adjustSlotIndex(-10)
+    );
+    elements.slotDecrease1?.addEventListener("click", () =>
+      adjustSlotIndex(-1)
+    );
+    elements.slotIncrease1?.addEventListener("click", () => adjustSlotIndex(1));
+    elements.slotIncrease10?.addEventListener("click", () =>
+      adjustSlotIndex(10)
+    );
+    elements.createBidButton?.addEventListener("click", createBid);
+    elements.acceptDisclaimer?.addEventListener("click", acceptDisclaimer);
+    elements.rejectDisclaimer?.addEventListener("click", rejectDisclaimer);
 
     // detect provider
     if (typeof window !== "undefined" && window.ethereum) {
@@ -948,15 +999,29 @@ import {
       );
 
       // Get minimum next bid
-      const minNextBid = await getMinimumNextBid(
+      const minNextBidData = await getMinimumNextBid(
         minterAddress,
         coreContractAddress,
         projectNumber
       );
+
+      let minNextBidValue = null;
+      let minSlotIndex = 0;
+
+      if (Array.isArray(minNextBidData) && minNextBidData.length >= 2) {
+        minNextBidValue = minNextBidData[0];
+        minSlotIndex = Number(minNextBidData[1]);
+      }
+
       updateElement(
         elements.minimumNextBid,
-        minNextBid ? `${formatEth(minNextBid)} ETH` : "—"
+        minNextBidValue ? `${formatEth(minNextBidValue)} ETH` : "—"
       );
+
+      // Initialize bidding controls
+      state.minimumSlotIndex = minSlotIndex;
+      state.currentSlotIndex = minSlotIndex;
+      await updateBidDisplay();
     } catch (err) {
       console.error("Failed to load MinterRAMV0 interface:", err);
     }
@@ -1278,6 +1343,247 @@ import {
       );
     } catch (err) {
       console.warn("Failed to refresh minter data", err);
+    }
+  }
+
+  async function adjustSlotIndex(delta) {
+    let newSlotIndex = state.currentSlotIndex + delta;
+
+    // Clamp to valid bounds instead of rejecting
+    if (newSlotIndex < state.minimumSlotIndex) {
+      newSlotIndex = state.minimumSlotIndex;
+    } else if (newSlotIndex > 511) {
+      newSlotIndex = 511;
+    }
+
+    hideBidError();
+    state.currentSlotIndex = newSlotIndex;
+    await updateBidDisplay();
+  }
+
+  async function updateBidDisplay() {
+    if (
+      !state.currentMinterAddress ||
+      !state.currentCoreAddress ||
+      state.currentProjectNumber === null
+    )
+      return;
+
+    // Update slot index display
+    if (elements.currentSlotIndex) {
+      elements.currentSlotIndex.textContent = state.currentSlotIndex;
+    }
+
+    // Update button states
+    updateSlotButtons();
+
+    // Get bid value for current slot
+    const bidValue = await getSlotIndexToBidValue(
+      state.currentMinterAddress,
+      state.currentCoreAddress,
+      state.currentProjectNumber,
+      state.currentSlotIndex
+    );
+
+    if (bidValue) {
+      state.currentBidValueWei = bidValue;
+      updateElement(elements.currentBidValue, `${formatEth(bidValue)} ETH`);
+
+      // Enable bid button if we have a valid bid value
+      if (elements.createBidButton) {
+        elements.createBidButton.disabled = false;
+      }
+    } else {
+      state.currentBidValueWei = null;
+      updateElement(elements.currentBidValue, "—");
+      if (elements.createBidButton) {
+        elements.createBidButton.disabled = true;
+      }
+    }
+  }
+
+  function updateSlotButtons() {
+    const canDecrease1 = state.currentSlotIndex > state.minimumSlotIndex;
+    const canDecrease10 = state.currentSlotIndex > state.minimumSlotIndex; // Can always decrease if not at minimum
+    const canIncrease1 = state.currentSlotIndex < 511;
+    const canIncrease10 = state.currentSlotIndex < 511; // Can always increase if not at maximum
+
+    if (elements.slotDecrease1) elements.slotDecrease1.disabled = !canDecrease1;
+    if (elements.slotDecrease10)
+      elements.slotDecrease10.disabled = !canDecrease10;
+    if (elements.slotIncrease1) elements.slotIncrease1.disabled = !canIncrease1;
+    if (elements.slotIncrease10)
+      elements.slotIncrease10.disabled = !canIncrease10;
+  }
+
+  async function getSlotIndexToBidValue(
+    minterAddress,
+    coreContractAddress,
+    projectNumber,
+    slotIndex
+  ) {
+    if (!state.ethereum || !state.minterRAMV0Abi) return null;
+    try {
+      const slotIndexToBidValueAbi = state.minterRAMV0Abi.find(
+        (item) =>
+          item.type === "function" && item.name === "slotIndexToBidValue"
+      );
+      if (!slotIndexToBidValueAbi) return null;
+
+      const data = encodeFunctionData({
+        abi: [slotIndexToBidValueAbi],
+        functionName: "slotIndexToBidValue",
+        args: [BigInt(projectNumber), coreContractAddress, BigInt(slotIndex)],
+      });
+
+      const result = await state.ethereum.request({
+        method: "eth_call",
+        params: [{ to: minterAddress, data }, "latest"],
+      });
+
+      const decoded = decodeFunctionResult({
+        abi: [slotIndexToBidValueAbi],
+        functionName: "slotIndexToBidValue",
+        data: result,
+      });
+
+      return decoded;
+    } catch (err) {
+      console.warn("getSlotIndexToBidValue failed", err);
+      return null;
+    }
+  }
+
+  async function createBid() {
+    if (!state.ethereum || !state.minterRAMV0Abi || !state.currentBidValueWei) {
+      showBidError("Cannot place bid - missing data");
+      return;
+    }
+
+    try {
+      hideBidError();
+      hideBidSuccess();
+
+      const createBidAbi = state.minterRAMV0Abi.find(
+        (item) => item.type === "function" && item.name === "createBid"
+      );
+      if (!createBidAbi) {
+        showBidError("createBid function not found in ABI");
+        return;
+      }
+
+      const data = encodeFunctionData({
+        abi: [createBidAbi],
+        functionName: "createBid",
+        args: [
+          BigInt(state.currentProjectNumber),
+          state.currentCoreAddress,
+          state.currentSlotIndex, // uint16, not BigInt
+        ],
+      });
+
+      const txHash = await state.ethereum.request({
+        method: "eth_sendTransaction",
+        params: [
+          {
+            from: state.account,
+            to: state.currentMinterAddress,
+            data: data,
+            value: "0x" + state.currentBidValueWei.toString(16),
+          },
+        ],
+      });
+
+      console.log("Bid transaction sent:", txHash);
+
+      // Show success message with Etherscan link
+      showBidSuccess(txHash);
+
+      // Refresh data after successful bid
+      setTimeout(() => refreshMinterData(), 2000);
+    } catch (err) {
+      console.error("createBid failed", err);
+      showBidError(err.message || "Failed to place bid");
+    }
+  }
+
+  function showBidError(message) {
+    if (elements.bidErrorText) {
+      elements.bidErrorText.textContent = message;
+    }
+    if (elements.bidError) {
+      elements.bidError.hidden = false;
+    }
+  }
+
+  function hideBidError() {
+    if (elements.bidError) {
+      elements.bidError.hidden = true;
+    }
+  }
+
+  function showBidSuccess(txHash) {
+    if (elements.txLink && elements.bidSuccess) {
+      const etherscanUrl = getEtherscanUrl(txHash);
+      elements.txLink.href = etherscanUrl;
+      elements.bidSuccess.hidden = false;
+    }
+  }
+
+  function hideBidSuccess() {
+    if (elements.bidSuccess) {
+      elements.bidSuccess.hidden = true;
+    }
+  }
+
+  function getEtherscanUrl(txHash) {
+    const baseUrl =
+      state.chainId === 1
+        ? "https://etherscan.io"
+        : "https://sepolia.etherscan.io";
+    return `${baseUrl}/tx/${txHash}`;
+  }
+
+  function acceptDisclaimer() {
+    console.log("acceptDisclaimer called");
+    if (elements.disclaimerModal) {
+      console.log("Hiding disclaimer modal");
+      elements.disclaimerModal.style.display = "none";
+    }
+    if (elements.experimentalBanner) {
+      console.log("Showing experimental banner");
+      elements.experimentalBanner.style.display = "block";
+    }
+    // Store acceptance in localStorage
+    localStorage.setItem("ab-minter-disclaimer-accepted", "true");
+    console.log("Disclaimer acceptance stored");
+  }
+
+  function rejectDisclaimer() {
+    // Close the page or show a message
+    if (
+      confirm(
+        "You must accept the disclaimer to use this experimental software. Close this page?"
+      )
+    ) {
+      window.close();
+    }
+  }
+
+  // Check if disclaimer was already accepted
+  function checkDisclaimerStatus() {
+    const accepted = localStorage.getItem("ab-minter-disclaimer-accepted");
+    console.log("checkDisclaimerStatus - accepted:", accepted);
+    if (accepted === "true") {
+      console.log("User previously accepted disclaimer, hiding modal");
+      if (elements.disclaimerModal) {
+        elements.disclaimerModal.style.display = "none";
+      }
+      if (elements.experimentalBanner) {
+        elements.experimentalBanner.style.display = "block";
+      }
+    } else {
+      console.log("No previous acceptance found, showing modal");
     }
   }
 })();

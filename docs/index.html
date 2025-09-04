@@ -8,7 +8,7 @@
       name="description"
       content="Art Blocks on-chain minter (experimental)"
     />
-    <title>AB On‑chain Minter (Experimental)</title>
+    <title>Art Blocks RPC-Only Minter</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -16,9 +16,46 @@
       This site requires JavaScript to connect to your wallet.
     </noscript>
 
+    <div id="disclaimerModal" class="modal-overlay">
+      <div class="modal-content">
+        <h2>⚠️ Experimental Software</h2>
+        <div class="disclaimer-text">
+          <p>
+            This is an <strong>experimental community project</strong> for
+            minting Art Blocks directly from the blockchain.
+          </p>
+          <ul>
+            <li>This software is provided "as is" without warranties</li>
+            <li>You use this tool entirely at your own risk</li>
+            <li>Always test on testnet (Sepolia) before using mainnet</li>
+            <li>Double-check all transaction details before confirming</li>
+            <li>This is not affiliated with Art Blocks LLC</li>
+          </ul>
+          <p>
+            <strong
+              >By continuing, you acknowledge these risks and agree to use this
+              experimental software at your own discretion.</strong
+            >
+          </p>
+        </div>
+        <div class="modal-actions">
+          <button id="acceptDisclaimer" class="button primary">
+            I Understand - Continue
+          </button>
+          <button id="rejectDisclaimer" class="button">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="experimentalBanner" class="experimental-banner" hidden>
+      🧪 <strong>Experimental:</strong> Community-built on-chain minter. Use at
+      your own risk.
+    </div>
+
     <header class="site-header">
-      <h1>Art Blocks On‑chain Minter</h1>
+      <h1>Art Blocks RPC-Only Minter</h1>
       <p class="tagline">Connect your wallet and mint directly from chain.</p>
+      <p class="warning-subtitle">⚠️ Not all projects are supported</p>
     </header>
 
     <main class="container">
@@ -172,6 +209,61 @@
                 </div>
               </div>
             </div>
+
+            <div class="bidding-section">
+              <h5>Place Bid</h5>
+              <div class="bid-controls">
+                <div class="slot-controls">
+                  <label>Bid Slot Index</label>
+                  <div class="slot-input-group">
+                    <button id="slotDecrease10" class="slot-btn" type="button">
+                      --
+                    </button>
+                    <button id="slotDecrease1" class="slot-btn" type="button">
+                      -
+                    </button>
+                    <span id="currentSlotIndex" class="slot-display">0</span>
+                    <button id="slotIncrease1" class="slot-btn" type="button">
+                      +
+                    </button>
+                    <button id="slotIncrease10" class="slot-btn" type="button">
+                      ++
+                    </button>
+                  </div>
+                </div>
+
+                <div class="bid-value">
+                  <label>Bid Amount</label>
+                  <span id="currentBidValue" class="bid-amount">—</span>
+                </div>
+              </div>
+
+              <div class="bid-actions">
+                <button
+                  id="createBidButton"
+                  class="button primary"
+                  type="button"
+                  disabled
+                >
+                  Place Bid
+                </button>
+              </div>
+
+              <div id="bidSuccess" class="success-alert" hidden>
+                <span>✅ Bid placed successfully! </span>
+                <a
+                  id="txLink"
+                  href="#"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >View on Etherscan</a
+                >
+              </div>
+
+              <div id="bidError" class="alert" hidden>
+                <span id="bidErrorText"></span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -187,8 +279,10 @@
             This prototype uses only your wallet's injected RPC (EIP‑1193
             provider).
           </li>
-          <li>Switch networks/accounts in your wallet to see live updates.</li>
-          <li>Minting logic and project discovery will be implemented next.</li>
+          <li>
+            <strong>Experimental software:</strong> Use at your own risk. Always
+            test on testnet before using mainnet.
+          </li>
         </ul>
       </section>
     </main>
