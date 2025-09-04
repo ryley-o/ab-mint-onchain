@@ -2,6 +2,8 @@
 
 Mint Art Blocks directly from the blockchain (no off‑chain APIs). Prototype static site designed for GitHub Pages hosting.
 
+Hosted on github pages at https://ryley-o.github.io/ab-mint-onchain/
+
 ## Project layout
 
 - `docs/`: Static site served by GitHub Pages
