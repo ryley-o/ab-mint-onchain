@@ -2,6 +2,8 @@
 
 Mint Art Blocks directly from the blockchain (no off‑chain APIs). Prototype static site designed for GitHub Pages hosting.
 
+:warning: Experimental software: Use at your own risk. Always test on testnet before using mainnet. This is a community project developed as open source to share with the community.
+
 Hosted on github pages at https://ryley-o.github.io/ab-mint-onchain/
 
 ## Project layout
@@ -50,13 +52,12 @@ No build step is required.
 - Connect wallet via `eth_requestAccounts`
 - Reactive UI updates on `accountsChanged`, `chainChanged`, `connect`, `disconnect`
 - Display account, chain, and ETH balance (from wallet RPC)
+- Support for RAM V0 minters
+- Minimal project support
 
 ## Next steps (TODO)
 
-- Query Art Blocks core contracts directly to discover projects (read‑only)
-- Implement minimal on‑chain mint function invocation
-- Network awareness and validation (e.g., only show actions on supported networks)
-- Basic error surfaces and user guidance
+- Improved project support and discovery
 
 ## Notes
 
